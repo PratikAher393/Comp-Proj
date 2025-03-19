@@ -2,10 +2,12 @@
 #SBATCH --job-name=nqs_mpi
 #SBATCH --output=nqs_mpi_%j.out
 #SBATCH --error=nqs_mpi_%j.err
-#SBATCH --nodes=1
-#SBATCH --ntasks=56
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=56
+#SBATCH --partition=condo-phys573
+#SBATCH --qos=condo
+#SBATCH --account=ISAAC-UTK0350
 #SBATCH --time=12:00:00
-#SBATCH --partition=standard
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=your.email@example.com
 
@@ -13,7 +15,8 @@ echo "Job started on $(date)"
 module load python/3.8
 module load mpi4py
 
-# Run the MPI-enabled simulation using 56 tasks
-srun -n 56 python main_mpi.py
+# Run the MPI-enabled simulation using a total of 112 tasks (56 per node on 2 nodes)
+srun -n 112 python main_mpi.py
 
 echo "Job ended on $(date)"
+
