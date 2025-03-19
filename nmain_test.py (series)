@@ -3,9 +3,14 @@
 main_test.py
 
 A serial test-run script for verifying code functionality with improved convergence,
-shift invariance, and advanced visualization of learned filters.
-This version increases burn-in, sample size, and iterations, uses a lower learning rate,
-and displays the acceptance rate.
+shift invariance, and advanced visualization of learned weights.
+This version increases the burn-in period, sample size, and number of iterations, uses a lower learning rate,
+and produces the following visualizations:
+  - Energy convergence vs. iterations.
+  - Magnetization convergence vs. iterations.
+  - Learned filters for each hidden unit (line plots).
+  - Hidden biases (bar chart).
+  - Distribution (histogram) of filter weights.
 """
 
 import numpy as np
@@ -16,11 +21,10 @@ from rbm_model import RBM, metropolis_sample_with_diagnostics, local_energy_tfi,
 from observables import compute_magnetization
 
 def main():
-    # Test parameters (adjusted for smoother convergence)
+    # Test parameters (tuned for smoother convergence)
     num_spins = 10
     num_hidden = 5
     h_field = 1.0
-    
     num_samples = 1000       # Increased sample count
     burn_in = 1000           # Increased burn-in steps
     num_iterations = 50      # More iterations for improved convergence
@@ -47,6 +51,7 @@ def main():
         mag_avg, _ = compute_magnetization(samples)
         magnetization_history.append(mag_avg)
         
+        # Simplified VMC loss estimation
         loss = sum([rbm.psi(v) * local_energy_tfi(rbm, v, h_field, neighbor_pairs) for v in samples]) / len(samples)
         optimizer.zero_grad()
         loss.backward()
@@ -54,7 +59,7 @@ def main():
         
         print(f"Iteration {it:2d}: Energy = {E_mean:.4f}, Magnetization = {mag_avg:.4f}, Acceptance Rate = {acc_rate:.2f}")
 
-    # Save outputs to text files
+    # Save energy and magnetization histories to text files
     np.savetxt("energy_history_test.txt", np.array(energy_history))
     np.savetxt("magnetization_history_test.txt", np.array(magnetization_history))
     
@@ -80,8 +85,32 @@ def main():
     plt.savefig("magnetization_convergence_test.png")
     plt.close()
 
-    # Visualize learned filters (shift-invariant mode)
+    # Visualize the learned filters (one plot per hidden unit)
     visualize_filters(rbm, filename_prefix='test_filter')
+
+    # Plot hidden biases as a bar chart
+    hidden_biases = rbm.b.detach().cpu().numpy()  # Shape: (num_hidden,)
+    plt.figure()
+    plt.bar(range(len(hidden_biases)), hidden_biases)
+    plt.title("Hidden Biases")
+    plt.xlabel("Hidden Unit Index")
+    plt.ylabel("Bias Value")
+    plt.savefig("hidden_biases.png")
+    plt.close()
+
+    # Print the visible bias (only one in shift-invariant mode)
+    if rbm.shift_invariant:
+        print(f"Visible bias a: {rbm.a.item()}")
+
+    # Plot a histogram of all filter weights (for shift-invariant RBM, filters in rbm.W shape: [num_hidden, num_visible])
+    filters = rbm.W.detach().cpu().numpy().flatten()
+    plt.figure()
+    plt.hist(filters, bins=20, edgecolor='black')
+    plt.title("Distribution of Filter Weights")
+    plt.xlabel("Weight Value")
+    plt.ylabel("Frequency")
+    plt.savefig("filter_histogram.png")
+    plt.close()
 
 if __name__ == "__main__":
     main()
