@@ -147,7 +147,7 @@ def main():
     plt.xlim(0, 50)  # Set x-axis limit
 
     plt.tight_layout()
-    plt.savefig('domain_wall_motion.png', dpi=300)
+    plt.savefig('2domain_wall_motion.png', dpi=300)
     plt.show()
 
 if __name__ == "__main__":
