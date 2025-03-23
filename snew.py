@@ -1,18 +1,17 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
 
 def domain_wall_dynamics(t, y, alpha, T, u, k, Kd, Ms, gamma, mu0, delta):
     """
-    Coupled differential equations for domain wall dynamics (Eqs. 2 and 3).
+    Coupled differential equations for domain wall dynamics (Eqs. 2 and 3 from the paper).
     """
     X, phi = y
     dXdt = (gamma * (Kd/(mu0*Ms)) * np.sin(2*phi) - T*u + (1-T)*alpha*delta*u*k) / (1 + alpha**2)
     dphidt = (-gamma * alpha * (Kd/(mu0*Ms)) * np.sin(2*phi) + (1-T)*u*k + T*alpha*u/delta) / (1 + alpha**2)
     return [dXdt, dphidt]
 
-def main(frequencies, T_interp, rho_interp):
+def main(frequencies):
     """
     Solves the model equations and plots domain wall displacement vs. time for different frequencies.
     """
@@ -44,15 +43,22 @@ def main(frequencies, T_interp, rho_interp):
     for frequency in frequencies:
         print(f"Solving for frequency: {frequency/1e9} GHz")
 
-        # Interpolate T from Figure 4
-        T = float(T_interp(frequency/1e9))  # T_interp expects frequency in GHz
-        rho = float(rho_interp(frequency/1e9))
-
-        # Estimate vg (Group Velocity) - You might need to calibrate or have a more accurate model
-        vg = 1000  #m/s
-
-        #CALIBRATE U --  This is the most important parameter to calibrate.
-        u = 0.001 * rho  # Example value -- you MUST calibrate this
+        # Frequency-dependent parameters (T, u, k) - THESE NEED CALIBRATION
+        if frequency == 22e9:
+            T = 0.4
+            vg = 1000
+            u = 35  # Needs Calibration - IMPORTANT
+        elif frequency == 70e9:
+            T = 0.98
+            vg = 2000
+            u = 16  # Needs Calibration - IMPORTANT
+        else:
+            #  Interpolate T, vg, u from Figure 4 if possible - REPLACE THIS
+            #  This is just a placeholder - YOU MUST DIGITIZE FIGURE 4 AND IMPLEMENT PROPER INTERPOLATION
+            T = 0.7  # Example Value - Needs to be based on Figure 4
+            vg = 1500 #Example value - Needs to be based on known physics
+            u = 25  # Example Value - Needs to be calibrated!
+            print(f"  Using placeholder T, vg, u values - Calibration is CRITICAL!")
 
         k = 2 * np.pi * frequency / vg
 
@@ -82,49 +88,6 @@ def main(frequencies, T_interp, rho_interp):
     plt.savefig('domain_wall_motion_model_frequencies.png', dpi=300)
     plt.show()
 
-# ---------------------- Data Interpolation ----------------------
-# Load digitized data
-data_figure4 = np.array([
-    [20, 0.40, 1.00],
-    [22, 0.40, 0.98],
-    [24, 0.41, 0.96],
-    [26, 0.42, 0.93],
-    [28, 0.44, 0.90],
-    [30, 0.47, 0.86],
-    [32, 0.50, 0.82],
-    [34, 0.54, 0.78],
-    [36, 0.58, 0.73],
-    [38, 0.62, 0.68],
-    [40, 0.67, 0.63],
-    [42, 0.72, 0.58],
-    [44, 0.77, 0.53],
-    [46, 0.82, 0.48],
-    [48, 0.87, 0.43],
-    [50, 0.92, 0.38],
-    [52, 0.95, 0.33],
-    [54, 0.97, 0.28],
-    [56, 0.98, 0.23],
-    [58, 0.98, 0.18],
-    [60, 0.98, 0.13],
-    [62, 0.98, 0.08],
-    [64, 0.98, 0.03],
-    [66, 0.98, 0.02],
-    [68, 0.98, 0.01],
-    [70, 0.98, 0.00]
-])
-
-# Separate frequency, T, and rho data
-frequency = data_figure4[:, 0]
-T_data = data_figure4[:, 1]
-rho_data = data_figure4[:, 2]
-
-# Create interpolation functions
-T_interp = interp1d(frequency, T_data, kind='linear', fill_value="extrapolate")
-rho_interp = interp1d(frequency, rho_data, kind='linear', fill_value="extrapolate")
-
 # Example usage: Specify the frequencies you want to simulate
 frequencies = [22e9, 70e9, 30e9, 40e9, 60e9]  # Example frequencies in Hz
-
-# Run the simulation
-main(frequencies, T_interp, rho_interp)
-
+main(frequencies)
