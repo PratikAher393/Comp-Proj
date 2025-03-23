@@ -42,26 +42,19 @@ def main():
     f_22GHz = 22e9
     vg_22GHz = 1000
     k_22GHz = 2*np.pi*f_22GHz/vg_22GHz
-    u_22GHz = 50
+    u_22GHz = 60  # Calibrated to reduce fluctuations
 
     # Parameters for 70 GHz case
     T_70GHz = 0.98
     f_70GHz = 70e9
     vg_70GHz = 2000
     k_70GHz = 2*np.pi*f_70GHz/vg_70GHz
-    u_70GHz = 20
+    u_70GHz = 30 # Calibrated to reduce fluctuations
 
     # Solve for 22 GHz case with alpha=0.01
     sol_22GHz_with_damping = solve_ivp(
         lambda t, y: domain_wall_dynamics(t, y, 0.01, T_22GHz, u_22GHz, k_22GHz, 
                                          Kd, Ms, gamma, mu0, delta),
-        t_span, y0, method='RK45', t_eval=t_eval
-    )
-
-    # Solve for 22 GHz case with alpha=0
-    sol_22GHz_no_damping = solve_ivp(
-        lambda t, y: domain_wall_dynamics(t, y, 0, T_22GHz, u_22GHz, k_22GHz, 
-                                        Kd, Ms, gamma, mu0, delta),
         t_span, y0, method='RK45', t_eval=t_eval
     )
 
@@ -72,82 +65,25 @@ def main():
         t_span, y0, method='RK45', t_eval=t_eval
     )
 
-    # Solve for 70 GHz case with alpha=0
-    sol_70GHz_no_damping = solve_ivp(
-        lambda t, y: domain_wall_dynamics(t, y, 0, T_70GHz, u_70GHz, k_70GHz, 
-                                       Kd, Ms, gamma, mu0, delta),
-        t_span, y0, method='RK45', t_eval=t_eval
-    )
-
-    # Extract micromagnetic simulation data points from paper
-    micro_data_22GHz = np.array([
-        [0, 0], [2.5, 15], [5, 44], [7.5, 83], [10, 132], 
-        [12.5, 188], [15, 246], [17.5, 301], [20, 352], 
-        [22.5, 398], [25, 440], [27.5, 478], [30, 512],
-        [32.5, 544], [35, 574], [37.5, 602], [40, 628],
-        [42.5, 652], [45, 674], [47.5, 695], [50, 714]
-    ])
-
-    micro_data_70GHz = np.array([
-        [0, 0], [2.5, -2.5], [5, -5.2], [7.5, -8], [10, -11], 
-        [12.5, -14], [15, -17], [17.5, -20], [20, -23], 
-        [22.5, -26], [25, -29], [27.5, -32], [30, -35],
-        [32.5, -38], [35, -41], [37.5, -44], [40, -47],
-        [42.5, -50], [45, -53], [47.5, -56], [50, -59]
-    ])
-
-    # Extract spin-polarized current simulation data from paper
-    current_data_22GHz = np.array([
-        [0, 0], [5, 42], [10, 130], [15, 240], 
-        [20, 350], [25, 435], [30, 510],
-        [35, 570], [40, 630], [45, 680], [50, 720]
-    ])
-
-    current_data_70GHz = np.array([
-        [0, 0], [5, -5], [10, -11], [15, -17], 
-        [20, -23], [25, -29], [30, -35],
-        [35, -41], [40, -47], [45, -53], [50, -59]
-    ])
-
     # Plot the results
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(10, 6))
 
-    # Plot for 22 GHz
-    plt.subplot(2, 1, 1)
+    # Plot for both 22 GHz and 70 GHz on the same plot
     plt.plot(sol_22GHz_with_damping.t * 1e9, sol_22GHz_with_damping.y[0] * 1e9, 'r-', 
-             linewidth=2, label='Model α=0.01')
-    plt.plot(sol_22GHz_no_damping.t * 1e9, sol_22GHz_no_damping.y[0] * 1e9, 'g--', 
-             linewidth=2, label='Model α=0')
-    plt.plot(micro_data_22GHz[:, 0], micro_data_22GHz[:, 1], 'ks', 
-             markersize=6, label='Micromagnetic simulation')
-    plt.plot(current_data_22GHz[:, 0], current_data_22GHz[:, 1], 'bo', 
-             markersize=6, label='Spin-polarized current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall displacement (nm)', fontsize=12)
-    plt.title('(a) f = 22 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)  # Set x-axis limit
+             linewidth=2, label='22 GHz (Model α=0.01)')
+    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'b-', 
+             linewidth=2, label='70 GHz (Model α=0.01)')
 
-    # Plot for 70 GHz
-    plt.subplot(2, 1, 2)
-    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'r-', 
-             linewidth=2, label='Model α=0.01')
-    plt.plot(sol_70GHz_no_damping.t * 1e9, sol_70GHz_no_damping.y[0] * 1e9, 'g--', 
-             linewidth=2, label='Model α=0')
-    plt.plot(micro_data_70GHz[:, 0], micro_data_70GHz[:, 1], 'ks', 
-             markersize=6, label='Micromagnetic simulation')
-    plt.plot(current_data_70GHz[:, 0], current_data_70GHz[:, 1], 'bo', 
-             markersize=6, label='Spin-polarized current')
     plt.xlabel('Time (ns)', fontsize=12)
     plt.ylabel('Wall displacement (nm)', fontsize=12)
-    plt.title('(b) f = 70 GHz', fontsize=14)
+    plt.title('Domain Wall Displacement vs. Time', fontsize=14)
     plt.legend(fontsize=10)
     plt.grid(True)
-    plt.xlim(0, 50)  # Set x-axis limit
+    plt.xlim(0, 50)
+    plt.ylim(-60, 1200)  # Set y-axis limits
 
     plt.tight_layout()
-    plt.savefig('2domain_wall_motion.png', dpi=300)
+    plt.savefig('3domain_wall_motion_combined.png', dpi=300)
     plt.show()
 
 if __name__ == "__main__":
