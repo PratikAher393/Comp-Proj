@@ -46,17 +46,13 @@ def main(frequencies, T_interp, rho_interp):
 
         # Interpolate T from Figure 4
         T = float(T_interp(frequency/1e9))  # T_interp expects frequency in GHz
-        rho = float(rho_interp(frequency/1e9)) #Rho interpolation
+        rho = float(rho_interp(frequency/1e9))
 
         # Estimate vg (Group Velocity) - You might need to calibrate or have a more accurate model
-        vg = 1000  #m/s Base value
-        if frequency > 40e9: #Example effect 
-            vg = 1000 + (frequency - 40e9) * (1000/30e9) #Linear approximation
+        vg = 1000  #m/s
 
         #CALIBRATE U --  This is the most important parameter to calibrate.
-        u = 10 #Base value to start calibration
-        if frequency > 40e9:
-            u = 10 + (frequency -40e9)*(10/30e9) #example
+        u = 0.001 * rho  # Example value -- you MUST calibrate this
 
         k = 2 * np.pi * frequency / vg
 
@@ -86,29 +82,45 @@ def main(frequencies, T_interp, rho_interp):
     plt.savefig('domain_wall_motion_model_frequencies.png', dpi=300)
     plt.show()
 
-# ---------------------- Data Digitization and Interpolation ----------------------
-# **Step 1: Data Digitization**
-# You will need to use a tool (e.g., WebPlotDigitizer, Engauge Digitizer) to extract the data points (frequency, T, rho) from Figure 4.
-# Save the digitized data into CSV files or text files.  For example:
-#   - freq_T_data.csv (two columns: frequency in GHz, Transmission Coefficient T)
-#   - freq_rho_data.csv (two columns: frequency in GHz, Spin Wave Amplitude rho)
-
-# **Step 2: Load Digitized Data**
-freq_T_data = np.array([
-    [20, 0.4], [30, 0.5], [40, 0.65], [50, 0.7], [60, 0.9], [70, 0.98]  # Example Data
+# ---------------------- Data Interpolation ----------------------
+# Load digitized data
+data_figure4 = np.array([
+    [20, 0.40, 1.00],
+    [22, 0.40, 0.98],
+    [24, 0.41, 0.96],
+    [26, 0.42, 0.93],
+    [28, 0.44, 0.90],
+    [30, 0.47, 0.86],
+    [32, 0.50, 0.82],
+    [34, 0.54, 0.78],
+    [36, 0.58, 0.73],
+    [38, 0.62, 0.68],
+    [40, 0.67, 0.63],
+    [42, 0.72, 0.58],
+    [44, 0.77, 0.53],
+    [46, 0.82, 0.48],
+    [48, 0.87, 0.43],
+    [50, 0.92, 0.38],
+    [52, 0.95, 0.33],
+    [54, 0.97, 0.28],
+    [56, 0.98, 0.23],
+    [58, 0.98, 0.18],
+    [60, 0.98, 0.13],
+    [62, 0.98, 0.08],
+    [64, 0.98, 0.03],
+    [66, 0.98, 0.02],
+    [68, 0.98, 0.01],
+    [70, 0.98, 0.00]
 ])
 
-freq_rho_data = np.array([
-    [20, 1.0], [30, 0.8], [40, 0.6], [50, 0.4], [60, 0.3], [70, 0.2]  # Example Data
-])
+# Separate frequency, T, and rho data
+frequency = data_figure4[:, 0]
+T_data = data_figure4[:, 1]
+rho_data = data_figure4[:, 2]
 
-# **Step 3: Create Interpolation Functions**
-#  Ensure frequencies are in increasing order for interpolation
-freq_T_data = freq_T_data[np.argsort(freq_T_data[:, 0])]
-freq_rho_data = freq_rho_data[np.argsort(freq_rho_data[:, 0])]
-
-T_interp = interp1d(freq_T_data[:, 0], freq_T_data[:, 1], kind='linear', fill_value="extrapolate")
-rho_interp = interp1d(freq_rho_data[:, 0], freq_rho_data[:, 1], kind='linear', fill_value="extrapolate")
+# Create interpolation functions
+T_interp = interp1d(frequency, T_data, kind='linear', fill_value="extrapolate")
+rho_interp = interp1d(frequency, rho_data, kind='linear', fill_value="extrapolate")
 
 # Example usage: Specify the frequencies you want to simulate
 frequencies = [22e9, 70e9, 30e9, 40e9, 60e9]  # Example frequencies in Hz
