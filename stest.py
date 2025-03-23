@@ -13,13 +13,13 @@ def domain_wall_dynamics(t, y, alpha, T, u, k, Kd, Ms, gamma, mu0, delta):
 
 def main():
     """
-    Main function to reproduce Figure 2 from the paper.
+    Generates the model calculation curves for Figure 2.
     """
     # Physical constants
     mu0 = 4 * np.pi * 1e-7
     gamma = 2.21e5
     
-    # Material parameters
+    # Material parameters (consistent with paper)
     Ms = 8.6e5
     Aex = 1.3e-11
     K1 = 5.8e5
@@ -31,225 +31,62 @@ def main():
     Kd = 0.5 * mu0 * Ms**2 * Nx_minus_Ny
     
     # Time span
-    t_span = (0, 50e-9)  # Extend to 50 ns to match the figure
-    t_eval = np.linspace(0, 50e-9, 500)  # Increase points for smoother curves
+    t_span = (0, 50e-9)
+    t_eval = np.linspace(0, 50e-9, 500)
 
     # Initial conditions
     y0 = [0, np.pi/2]
 
     # Parameters for 22 GHz case
-    T_22GHz = 0.4
+    T_22GHz = 0.4  # Transmission coefficient (from paper)
     f_22GHz = 22e9
     vg_22GHz = 1000
     k_22GHz = 2*np.pi*f_22GHz/vg_22GHz
-    u_22GHz = 60 # Adjusted from previous value
+    u_22GHz = 35   # Adjusted based on data
 
     # Parameters for 70 GHz case
-    T_70GHz = 0.98
+    T_70GHz = 0.98  # Transmission coefficient (from paper)
     f_70GHz = 70e9
     vg_70GHz = 2000
-    k_70GHz = 2*np.pi*f_70GHz/vg_70GHz
-    u_70GHz = 30  # Adjusted from previous value
+    k_70GHz = 2*np.pi*f_70GHz/vg_22GHz
+    u_70GHz = 16   # Adjusted based on data
 
-    # Solve for 22 GHz case with alpha=0.01
+    # Solve for 22 GHz case with damping (alpha=0.01)
     sol_22GHz_with_damping = solve_ivp(
         lambda t, y: domain_wall_dynamics(t, y, 0.01, T_22GHz, u_22GHz, k_22GHz, 
                                          Kd, Ms, gamma, mu0, delta),
-        t_span, y0, method='RK45', t_eval=t_eval
+        t_span, y0, method='RK45', t_eval=t_eval, dense_output=True
     )
 
-    # Solve for 70 GHz case with alpha=0.01
+    # Solve for 70 GHz case with damping (alpha=0.01)
     sol_70GHz_with_damping = solve_ivp(
         lambda t, y: domain_wall_dynamics(t, y, 0.01, T_70GHz, u_70GHz, k_70GHz, 
                                         Kd, Ms, gamma, mu0, delta),
-        t_span, y0, method='RK45', t_eval=t_eval
+        t_span, y0, method='RK45', t_eval=t_eval, dense_output=True
     )
 
-    # Extract micromagnetic simulation data points from paper
-    micro_data_22GHz = np.array([
-        [0, 0], [2.5, 15], [5, 44], [7.5, 83], [10, 132], 
-        [12.5, 188], [15, 246], [17.5, 301], [20, 352], 
-        [22.5, 398], [25, 440], [27.5, 478], [30, 512],
-        [32.5, 544], [35, 574], [37.5, 602], [40, 628],
-        [42.5, 652], [45, 674], [47.5, 695], [50, 714]
-    ])
+    # Generate Plot
+    plt.figure(figsize=(10, 6))
 
-    micro_data_70GHz = np.array([
-        [0, 0], [2.5, -2.5], [5, -5.2], [7.5, -8], [10, -11], 
-        [12.5, -14], [15, -17], [17.5, -20], [20, -23], 
-        [22.5, -26], [25, -29], [27.5, -32], [30, -35],
-        [32.5, -38], [35, -41], [37.5, -44], [40, -47],
-        [42.5, -50], [45, -53], [47.5, -56], [50, -59]
-    ])
+    # Plot 22 GHz data
+    plt.plot(sol_22GHz_with_damping.t * 1e9, sol_22GHz_with_damping.y[0] * 1e9, 'r-', label='22 GHz (Model α=0.01)')
 
-    # Extract spin-polarized current simulation data from paper
-    current_data_22GHz = np.array([
-        [0, 0], [5, 42], [10, 130], [15, 240], 
-        [20, 350], [25, 435], [30, 510],
-        [35, 570], [40, 630], [45, 680], [50, 720]
-    ])
+    # Plot 70 GHz data
+    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'b-', label='70 GHz (Model α=0.01)')
 
-    current_data_70GHz = np.array([
-        [0, 0], [5, -5], [10, -11], [15, -17], 
-        [20, -23], [25, -29], [30, -35],
-        [35, -41], [40, -47], [45, -53], [50, -59]
-    ])
-     # Plot the results - Individual Plots
-    plt.figure(figsize=(12, 6))
-
-    # Plot for 22 GHz (Figure 2a)
-    plt.subplot(1, 2, 1)
-    plt.plot(sol_22GHz_with_damping.t * 1e9, sol_22GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_22GHz[:, 0], micro_data_22GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_22GHz[:, 0], current_data_22GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(a) 22 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
+    # Customize Plot
+    plt.xlabel('Time (ns)')
+    plt.ylabel('Wall Displacement (nm)')
+    plt.title('Domain Wall Displacement vs. Time (Model Calculation)')
     plt.xlim(0, 50)
-    plt.ylim(-60, 1200)
-
-    # Plot for 70 GHz (Figure 2b)
-    plt.subplot(1, 2, 2)
-    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_70GHz[:, 0], micro_data_70GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_70GHz[:, 0], current_data_70GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(b) 70 GHz', fontsize=14)
-    plt.legend(fontsize=10)
+    plt.ylim(-60, 800) #Adjust as needed
+    plt.legend()
     plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 100)
-
     plt.tight_layout()
-    plt.savefig('domain_wall_motion_individual.png', dpi=300)
+
+    # Save and Display
+    plt.savefig('domain_wall_motion_model_only.png', dpi=300)
     plt.show()
-
-    # Plot the results - Combined Plots
-    plt.figure(figsize=(12, 6))
-
-    # Plot for 22 GHz (Figure 2a)
-    plt.subplot(1, 2, 1)
-    plt.plot(sol_22GHz_with_damping.t * 1e9, sol_22GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_22GHz[:, 0], micro_data_22GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_22GHz[:, 0], current_data_22GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(a) 22 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 1200)
-
-    # Plot for 70 GHz (Figure 2b)
-    plt.subplot(1, 2, 2)
-    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_70GHz[:, 0], micro_data_70GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_70GHz[:, 0], current_data_70GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(b) 70 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 100)
-
-    plt.tight_layout()
-    plt.savefig('domain_wall_motion_combined.png', dpi=300)
-    plt.show()
-
-    # Plot the results - Combined Plots
-    plt.figure(figsize=(12, 6))
-
-    # Plot for 22 GHz (Figure 2a)
-    plt.subplot(1, 2, 1)
-    plt.plot(sol_22GHz_with_damping.t * 1e9, sol_22GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_22GHz[:, 0], micro_data_22GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_22GHz[:, 0], current_data_22GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(a) 22 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 1200)
-
-    # Plot for 70 GHz (Figure 2b)
-    plt.subplot(1, 2, 2)
-    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_70GHz[:, 0], micro_data_70GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_70GHz[:, 0], current_data_70GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(b) 70 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 100)
-
-    plt.tight_layout()
-    plt.savefig('domain_wall_motion_combined.png', dpi=300)
-    plt.show()
-
-    # Plot the results - Combined Plots
-    plt.figure(figsize=(12, 6))
-
-    # Plot for 22 GHz (Figure 2a)
-    plt.subplot(1, 2, 1)
-    plt.plot(sol_22GHz_with_damping.t * 1e9, sol_22GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_22GHz[:, 0], micro_data_22GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_22GHz[:, 0], current_data_22GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(a) 22 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 1200)
-
-    # Plot for 70 GHz (Figure 2b)
-    plt.subplot(1, 2, 2)
-    plt.plot(sol_70GHz_with_damping.t * 1e9, sol_70GHz_with_damping.y[0] * 1e9, 'r-',
-             linewidth=2, label='Model α=0.01')
-    plt.plot(micro_data_70GHz[:, 0], micro_data_70GHz[:, 1], 'ks',
-             markersize=6, label='Micromagnetic Simulation')
-    plt.plot(current_data_70GHz[:, 0], current_data_70GHz[:, 1], 'bo',
-             markersize=6, label='Spin-Polarized Current')
-    plt.xlabel('Time (ns)', fontsize=12)
-    plt.ylabel('Wall Displacement (nm)', fontsize=12)
-    plt.title('(b) 70 GHz', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True)
-    plt.xlim(0, 50)
-    plt.ylim(-60, 100)
-
-    plt.tight_layout()
-    plt.savefig('domain_wall_motion_combined.png', dpi=300)
-    plt.show()
-
 
 if __name__ == "__main__":
     main()
