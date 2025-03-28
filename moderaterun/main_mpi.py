@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
-"""
-main_mpi.py
-
-MPI-enabled VMC simulation for the TFI model in shift-invariant mode.
-Configured for a moderate run (approximately 6 hours) on 56 processors per node.
-After training, the filters are visualized (only on rank 0).
-"""
 
 from mpi4py import MPI
 import numpy as np
 import torch
 import torch.optim as optim
-from rbm_model import RBM, metropolis_sample, local_energy_tfi, generate_neighbor_pairs_1D, visualize_filters
-from observables import compute_magnetization
+from nrbm_model import RBM, metropolis_sample, local_energy_tfi, generate_neighbor_pairs_1D, visualize_filters
+from nobservables import compute_magnetization
+import matplotlib.pyplot as plt
 
 def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    # Simulation parameters (moderate run)
+    # Simulation parameters for a moderate 6-hour run on one node
     num_spins = 20
     num_hidden = 10
     h_field = 1.0
@@ -34,7 +28,7 @@ def main():
     optimizer = optim.Adam(rbm.parameters(), lr=learning_rate)
     neighbor_pairs = generate_neighbor_pairs_1D(num_spins)
     
-    # Different seeds per MPI rank for independent sampling
+    # Use different seeds per MPI rank for independent sampling
     np.random.seed(42 + rank)
     torch.manual_seed(42 + rank)
     v0 = torch.tensor(np.random.choice([-1, 1], size=num_spins), dtype=torch.double)
@@ -59,7 +53,7 @@ def main():
         if it % 10 == 0:
             print(f"[Rank {rank:2d}] Iteration {it:3d}: Energy = {E_mean:.4f}, Magnetization = {mag_avg:.4f}")
 
-    # Gather results from all MPI processes
+    # Gather results from all MPI processes (should be 56 tasks on one node)
     energies_all = comm.gather(energy_history, root=0)
     mags_all = comm.gather(magnetization_history, root=0)
 
@@ -68,10 +62,35 @@ def main():
         avg_mag = np.mean(np.array(mags_all), axis=0)
         np.savetxt("energy_history_parallel.txt", avg_energy)
         np.savetxt("magnetization_parallel.txt", avg_mag)
-        print("Parallel moderate run completed. Outputs saved.")
+        print("Parallel moderate run completed on one node. Outputs saved.")
 
-        # Visualize filters from one of the RBM instances (from rank 0)
-        visualize_filters(rbm, filename_prefix='mpi_filter')
+        # Visualize learned filters: montage and heatmap
+        visualize_filters(rbm, filename_prefix='mpi_filter', montage=True)
+        
+        # Plot hidden biases as a bar chart
+        hidden_biases = rbm.b.detach().cpu().numpy()
+        plt.figure()
+        plt.bar(range(len(hidden_biases)), hidden_biases)
+        plt.title("Hidden Biases")
+        plt.xlabel("Hidden Unit Index")
+        plt.ylabel("Bias Value")
+        plt.savefig("mpi_hidden_biases.png")
+        plt.close()
+        
+        # Print visible bias (for shift-invariant RBM, there's only one scalar)
+        if rbm.shift_invariant:
+            print(f"Visible bias a: {rbm.a.item()}")
+        
+        # Plot a histogram of all filter weights
+        filters = rbm.W.detach().cpu().numpy().flatten()
+        plt.figure()
+        plt.hist(filters, bins=20, edgecolor='black')
+        plt.title("Distribution of Filter Weights")
+        plt.xlabel("Weight Value")
+        plt.ylabel("Frequency")
+        plt.savefig("mpi_filter_histogram.png")
+        plt.close()
 
 if __name__ == "__main__":
     main()
+
