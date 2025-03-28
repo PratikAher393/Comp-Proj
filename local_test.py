@@ -1,63 +1,24 @@
 #!/usr/bin/env python3
-"""
-main_test.py
-
-A modified serial test-run script with higher sampling, longer burn-in, more iterations,
-and a smaller learning rate to achieve smoother convergence.
-"""
 
 import numpy as np
 import torch
 import torch.optim as optim
 import matplotlib.pyplot as plt
-from rbm_model import RBM, metropolis_sample, local_energy_tfi, generate_neighbor_pairs_1D
-from observables import compute_magnetization
-
-def metropolis_sample_with_diagnostics(rbm, v, num_samples, burn_in=1000):
-    """
-    Metropolis sampling that tracks acceptance rate.
-    Increased burn-in and sample size to reduce fluctuations.
-    """
-    samples = []
-    current_v = v.clone()
-    accepted_moves = 0
-    total_moves = 0
-    total_steps = num_samples + burn_in
-    
-    for step in range(total_steps):
-        i = np.random.randint(0, rbm.num_visible)
-        proposed_v = current_v.clone()
-        proposed_v[i] *= -1  # flip spin
-        psi_current = torch.exp(2 * rbm.forward(current_v))
-        psi_proposed = torch.exp(2 * rbm.forward(proposed_v))
-        acceptance = min(1, (psi_proposed / psi_current).item())
-        total_moves += 1
-        if np.random.rand() < acceptance:
-            current_v = proposed_v
-            accepted_moves += 1
-        if step >= burn_in:
-            samples.append(current_v.clone())
-    
-    acceptance_rate = accepted_moves / total_moves
-    return samples, acceptance_rate
+from nrbm_model import RBM, metropolis_sample_with_diagnostics, local_energy_tfi, generate_neighbor_pairs_1D, visualize_filters
+from nobservables import compute_magnetization
 
 def main():
-    # Adjusted parameters for improved stability
+    # Test parameters for a quick local run:
     num_spins = 10
     num_hidden = 5
     h_field = 1.0
-    
-    # Increased sampling
-    num_samples = 1000      
-    burn_in = 1000          
-    
-    # More VMC iterations
-    num_iterations = 50     
-    
-    # Smaller learning rate for smoother updates
-    learning_rate = 0.002   
+    num_samples = 100    # Reduced sample count
+    burn_in = 100        # Reduced burn-in steps
+    num_iterations = 5   # Fewer iterations for a quick test
+    learning_rate = 0.002
 
-    rbm = RBM(num_spins, num_hidden).double()
+    # Instantiate RBM in shift-invariant mode
+    rbm = RBM(num_spins, num_hidden, shift_invariant=True).double()
     optimizer = optim.Adam(rbm.parameters(), lr=learning_rate)
     neighbor_pairs = generate_neighbor_pairs_1D(num_spins)
     
@@ -70,30 +31,25 @@ def main():
 
     for it in range(num_iterations):
         samples, acc_rate = metropolis_sample_with_diagnostics(rbm, v0, num_samples, burn_in=burn_in)
-        
-        # Compute local energies
         E_locals = [local_energy_tfi(rbm, v, h_field, neighbor_pairs) for v in samples]
         E_mean = np.mean(E_locals)
         energy_history.append(E_mean)
         
-        # Compute magnetization
         mag_avg, _ = compute_magnetization(samples)
         magnetization_history.append(mag_avg)
         
-        # Simplified VMC loss
         loss = sum([rbm.psi(v) * local_energy_tfi(rbm, v, h_field, neighbor_pairs) for v in samples]) / len(samples)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         
-        # Print iteration info
         print(f"Iteration {it:2d}: Energy = {E_mean:.4f}, Magnetization = {mag_avg:.4f}, Acceptance Rate = {acc_rate:.2f}")
 
-    # Save results
+    # Save energy and magnetization histories to text files
     np.savetxt("energy_history_test.txt", np.array(energy_history))
     np.savetxt("magnetization_history_test.txt", np.array(magnetization_history))
     
-    # Plot Energy Convergence
+    # Plot energy convergence
     plt.figure(figsize=(6,4))
     plt.plot(energy_history, marker='o', label="Energy")
     plt.xlabel("Iteration")
@@ -104,7 +60,7 @@ def main():
     plt.savefig("energy_convergence_test.png")
     plt.close()
 
-    # Plot Magnetization Convergence
+    # Plot magnetization convergence
     plt.figure(figsize=(6,4))
     plt.plot(magnetization_history, marker='o', label="Magnetization", color='red')
     plt.xlabel("Iteration")
@@ -115,5 +71,33 @@ def main():
     plt.savefig("magnetization_convergence_test.png")
     plt.close()
 
+    # Visualize the learned filters: montage and heatmap
+    visualize_filters(rbm, filename_prefix='test_filter', montage=True)
+
+    # Plot hidden biases as a bar chart
+    hidden_biases = rbm.b.detach().cpu().numpy()
+    plt.figure()
+    plt.bar(range(len(hidden_biases)), hidden_biases)
+    plt.title("Hidden Biases")
+    plt.xlabel("Hidden Unit Index")
+    plt.ylabel("Bias Value")
+    plt.savefig("hidden_biases.png")
+    plt.close()
+
+    # Print visible bias (for shift-invariant RBM, there's only one scalar)
+    if rbm.shift_invariant:
+        print(f"Visible bias a: {rbm.a.item()}")
+
+    # Plot a histogram of all filter weights
+    filters = rbm.W.detach().cpu().numpy().flatten()
+    plt.figure()
+    plt.hist(filters, bins=20, edgecolor='black')
+    plt.title("Distribution of Filter Weights")
+    plt.xlabel("Weight Value")
+    plt.ylabel("Frequency")
+    plt.savefig("filter_histogram.png")
+    plt.close()
+
 if __name__ == "__main__":
     main()
+

@@ -42,3 +42,4 @@ def compute_correlation(samples, num_spins):
             correlations[d] += np.mean(v_np * np.roll(v_np, d))
     correlations /= len(samples)
     return correlations
+

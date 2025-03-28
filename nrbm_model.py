@@ -5,13 +5,13 @@ rbm_model.py
 This module implements the Restricted Boltzmann Machine (RBM) used as a variational ansatz 
 for neural-network quantum states. It supports two modes:
   - Standard RBM: Each visible unit has its own bias and weight.
-  - Shift-Invariant RBM: Enforces translational invariance; the visible bias is scalar and 
-    the weight matrix is given as a set of filters that are shared across sites.
+  - Shift-Invariant RBM: Enforces translational invariance; the visible bias is a scalar and 
+    the weight matrix is given as a set of filters shared across sites.
 It also provides functions for:
   - Metropolis Monte Carlo sampling.
   - Local energy evaluation for the transverse-field Ising (TFI) model.
   - Generating nearest-neighbor pairs for a 1D chain with periodic boundary conditions.
-  - Visualization of the learned filters.
+  - Visualization of the learned filters (montage and heatmap).
 """
 
 import numpy as np
@@ -41,7 +41,7 @@ class RBM(nn.Module):
     def forward(self, v):
         """
         Compute the logarithm of the wave function amplitude for configuration v.
-        v: a torch tensor of shape (num_visible,) with values ±1.
+        v: torch tensor of shape (num_visible,) with values ±1.
         """
         if self.shift_invariant:
             # Visible term: same bias for all sites.
@@ -71,7 +71,7 @@ def metropolis_sample(rbm, v, num_samples, burn_in=1000):
       burn_in: Number of initial steps to discard.
       
     Returns:
-      A list of torch tensors representing sampled spin configurations.
+      List of torch tensors representing sampled spin configurations.
     """
     samples = []
     current_v = v.clone()
@@ -123,22 +123,20 @@ def local_energy_tfi(rbm, v, h, neighbor_pairs):
     Compute the local energy for the transverse-field Ising (TFI) model:
        H = -h * sum_i σ^x_i - sum_{<ij>} σ^z_i σ^z_j
        
-    For each spin configuration v, the off-diagonal term is evaluated by flipping one spin.
+    The off-diagonal term is evaluated by flipping one spin.
     
     Parameters:
       rbm: RBM instance.
       v: Spin configuration (torch tensor).
       h: Transverse field strength.
-      neighbor_pairs: List of nearest-neighbor index pairs.
+      neighbor_pairs: List of nearest-neighbor pairs.
       
     Returns:
       Local energy (float) for configuration v.
     """
-    # Diagonal term: interaction energy between neighbors
     E_diag = 0.0
     for (i, j) in neighbor_pairs:
         E_diag += - v[i].item() * v[j].item()
-    # Off-diagonal term: transverse field term
     E_off = 0.0
     for i in range(rbm.num_visible):
         v_flip = v.clone()
@@ -156,35 +154,62 @@ def generate_neighbor_pairs_1D(num_spins):
       num_spins: Total number of spins.
       
     Returns:
-      A list of tuples (i, j) of neighboring spin indices.
+      List of tuples (i, j) of neighboring spin indices.
     """
     return [(i, (i+1) % num_spins) for i in range(num_spins)]
 
-def visualize_filters(rbm, filename_prefix='filter'):
+def visualize_filters(rbm, filename_prefix='filter', montage=True):
     """
     Visualize the learned weight filters.
-    For shift-invariant RBM, each hidden unit has a filter of length num_visible.
-    For standard RBM, visualize the full weight matrix.
+    For a shift-invariant RBM, each hidden unit has a filter of length num_visible.
+    This function generates both:
+      - A montage of individual filter plots.
+      - A heatmap of the entire weight matrix.
+    For a standard RBM, it visualizes the full weight matrix as a heatmap.
     
     Parameters:
       rbm: An instance of RBM.
-      filename_prefix: Prefix for the output image files.
+      filename_prefix: Prefix for output image files.
+      montage: If True, generate a montage of individual filter plots.
     """
     import matplotlib.pyplot as plt
     if rbm.shift_invariant:
-        # Plot each hidden unit's filter as a line plot.
-        num_filters = rbm.num_hidden
-        for f in range(num_filters):
-            plt.figure()
-            plt.plot(rbm.W[f].detach().cpu().numpy())
-            plt.title(f"Hidden Unit {f} Filter")
-            plt.xlabel("Visible Index")
-            plt.ylabel("Weight")
-            plt.savefig(f"{filename_prefix}_{f}.png")
+        if montage:
+            num_filters = rbm.num_hidden
+            ncols = int(np.ceil(np.sqrt(num_filters)))
+            nrows = int(np.ceil(num_filters / ncols))
+            fig, axs = plt.subplots(nrows, ncols, figsize=(ncols*3, nrows*2))
+            axs = axs.flatten()
+            for f in range(num_filters):
+                axs[f].plot(rbm.W[f].detach().cpu().numpy())
+                axs[f].set_title(f"Hidden {f}")
+                axs[f].set_xlabel("Visible Index")
+                axs[f].set_ylabel("Weight")
+            for j in range(num_filters, len(axs)):
+                fig.delaxes(axs[j])
+            plt.tight_layout()
+            plt.savefig(f"{filename_prefix}_montage.png")
             plt.close()
+        else:
+            for f in range(rbm.num_hidden):
+                plt.figure()
+                plt.plot(rbm.W[f].detach().cpu().numpy())
+                plt.title(f"Hidden Unit {f} Filter")
+                plt.xlabel("Visible Index")
+                plt.ylabel("Weight")
+                plt.savefig(f"{filename_prefix}_{f}.png")
+                plt.close()
+        # Generate a heatmap of the entire weight matrix
+        plt.figure(figsize=(8,6))
+        plt.imshow(rbm.W.detach().cpu().numpy(), aspect='auto', cmap='viridis')
+        plt.colorbar()
+        plt.title("Heatmap of Shift-Invariant Filters")
+        plt.xlabel("Visible Index")
+        plt.ylabel("Hidden Unit Index")
+        plt.savefig(f"{filename_prefix}_heatmap.png")
+        plt.close()
     else:
-        # Visualize the weight matrix as an image.
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(8,6))
         plt.imshow(rbm.W.detach().cpu().numpy(), aspect='auto', cmap='viridis')
         plt.colorbar()
         plt.title("RBM Weight Matrix")
@@ -192,3 +217,4 @@ def visualize_filters(rbm, filename_prefix='filter'):
         plt.ylabel("Visible Unit Index")
         plt.savefig(f"{filename_prefix}_matrix.png")
         plt.close()
+
