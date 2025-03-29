@@ -14,12 +14,12 @@ def main():
     size = comm.Get_size()
 
     # Simulation parameters for a moderate 6-hour run on one node
-    num_spins = 20
-    num_hidden = 10
+    num_spins = 80
+    num_hidden = 320
     h_field = 1.0
     
-    num_samples = 2000     # Increased sample count per iteration
-    burn_in = 2000         # Increased burn-in steps
+    num_samples = 5000     # Increased sample count per iteration
+    burn_in = 10000         # Increased burn-in steps
     num_iterations = 200   # More iterations for a moderate run
     learning_rate = 0.001  # Lower learning rate
 

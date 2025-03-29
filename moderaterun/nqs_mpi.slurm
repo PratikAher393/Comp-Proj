@@ -12,14 +12,12 @@
 #SBATCH --mail-user=paher@vols.utk.edu
 
 echo "Job started on $(date)"
-module load python/3.9.10
-module load mpi4py
 
 source /nfs/home/paher/venv/bin/activate
 
 
 # Run the MPI-enabled simulation using 56 tasks (one node)
-srun -n 56 python main_mpi.py
+srun -n 56 python3 main_mpi.py
 
 echo "Job ended on $(date)"
 
