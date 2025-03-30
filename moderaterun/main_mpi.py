@@ -7,19 +7,21 @@ import torch.optim as optim
 from nrbm_model import RBM, metropolis_sample, local_energy_tfi, generate_neighbor_pairs_1D, visualize_filters
 from nobservables import compute_magnetization
 import matplotlib.pyplot as plt
+from datetime import datetime
+import sys
 
 def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    # Simulation parameters for a moderate 6-hour run on one node
+    # Simulation parameters for a moderate run on one node
     num_spins = 80
     num_hidden = 320
     h_field = 1.0
     
     num_samples = 5000     # Increased sample count per iteration
-    burn_in = 10000         # Increased burn-in steps
+    burn_in = 10000        # Increased burn-in steps
     num_iterations = 200   # More iterations for a moderate run
     learning_rate = 0.001  # Lower learning rate
 
@@ -50,8 +52,11 @@ def main():
         loss.backward()
         optimizer.step()
         
+        # Every 10 iterations, print progress with time stamp and flush output
         if it % 10 == 0:
-            print(f"[Rank {rank:2d}] Iteration {it:3d}: Energy = {E_mean:.4f}, Magnetization = {mag_avg:.4f}")
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[Rank {rank:2d}] Iteration {it:3d} at {now}: Energy = {E_mean:.4f}, Magnetization = {mag_avg:.4f}")
+            sys.stdout.flush()
 
     # Gather results from all MPI processes (should be 56 tasks on one node)
     energies_all = comm.gather(energy_history, root=0)

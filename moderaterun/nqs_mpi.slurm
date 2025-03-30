@@ -7,7 +7,7 @@
 #SBATCH --partition=condo-phys573
 #SBATCH --qos=condo
 #SBATCH --account=ISAAC-UTK0350
-#SBATCH --time=06:00:00
+#SBATCH --time=20:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=paher@vols.utk.edu
 
