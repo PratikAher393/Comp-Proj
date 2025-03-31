@@ -1,0 +1,37 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+from torch.serialization import safe_globals
+
+with safe_globals([np.dtype, np._core.multiarray.scalar]):
+    checkpoint = torch.load("checkpoint.pth", map_location='cpu', weights_only=False)
+
+weights = checkpoint["rbm_state_dict"]["W"].numpy()  # shape: (num_hidden, num_visible)
+
+# Plot a heatmap of the entire weight matrix
+plt.figure(figsize=(8, 6))
+plt.imshow(weights, aspect='auto', cmap='RdBu', vmin=-0.15, vmax=0.15)
+plt.colorbar(label="Weight Value")
+plt.title("Feature Map Heatmap")
+plt.xlabel("Visible Index")
+plt.ylabel("Hidden Unit Index")
+plt.savefig("feature_map_heatmap.png")
+plt.close()
+
+# Optionally, generate a montage of individual filter plots
+num_filters = weights.shape[0]
+ncols = int(np.ceil(np.sqrt(num_filters)))
+nrows = int(np.ceil(num_filters / ncols))
+fig, axs = plt.subplots(nrows, ncols, figsize=(ncols * 3, nrows * 2))
+axs = axs.flatten()
+for f in range(num_filters):
+    axs[f].plot(weights[f])
+    axs[f].set_title(f"Hidden {f}")
+    axs[f].set_xlabel("Visible Index")
+    axs[f].set_ylabel("Weight")
+for j in range(num_filters, len(axs)):
+    fig.delaxes(axs[j])
+plt.tight_layout()
+plt.savefig("feature_map_montage.png")
+plt.close()
+
