@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-main_mpi.py
-
-MPI-enabled VMC simulation for the TFI model in shift-invariant mode.
-This code is configured for a moderate run on one node with 56 tasks.
-After training, rank 0 gathers results and generates visualizations:
-  - Energy and magnetization convergence plots.
-  - Montage of learned filters and a heatmap.
-  - Hidden biases as a bar chart.
-  - Histogram of filter weights.
-Progress (with time stamps) is printed every 10 iterations.
-"""
 
 from mpi4py import MPI
 import numpy as np
@@ -20,7 +8,7 @@ from nrbm_model import RBM, metropolis_sample, local_energy_tfi, generate_neighb
 from nobservables import compute_magnetization
 import matplotlib.pyplot as plt
 from datetime import datetime
-import sys
+import sys, os
 
 def main():
     comm = MPI.COMM_WORLD
@@ -32,9 +20,9 @@ def main():
     num_hidden = 320
     h_field = 1.0
     
-    num_samples = 10000     # Increased sample count per iteration
-    burn_in = 20000        # Increased burn-in steps
-    num_iterations = 1000   # More iterations for a moderate run
+    num_samples = 5000     # Increased sample count per iteration
+    burn_in = 10000        # Increased burn-in steps
+    num_iterations = 500   # Total iterations set to 500
     learning_rate = 0.001  # Lower learning rate
 
     # Instantiate RBM in shift-invariant mode
@@ -49,8 +37,24 @@ def main():
     
     energy_history = []
     magnetization_history = []
+    
+    checkpoint_file = "checkpoint.pth"
+    start_iteration = 0
+    # Rank 0 checks for a checkpoint and loads it if present
+    if rank == 0 and os.path.exists(checkpoint_file):
+        checkpoint = torch.load(checkpoint_file)
+        start_iteration = checkpoint["iteration"] + 1
+        rbm.load_state_dict(checkpoint["rbm_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        energy_history = checkpoint["energy_history"]
+        magnetization_history = checkpoint["magnetization_history"]
+        print(f"Loaded checkpoint from iteration {checkpoint['iteration']}")
+        sys.stdout.flush()
+    # Broadcast the starting iteration to all ranks
+    start_iteration = comm.bcast(start_iteration, root=0)
 
-    for it in range(num_iterations):
+    # Run iterations from start_iteration to num_iterations
+    for it in range(start_iteration, num_iterations):
         samples = metropolis_sample(rbm, v0, num_samples, burn_in=burn_in)
         E_locals = [local_energy_tfi(rbm, v, h_field, neighbor_pairs) for v in samples]
         E_mean = np.mean(E_locals)
@@ -70,6 +74,20 @@ def main():
             print(f"[Rank {rank:2d}] Iteration {it:3d} at {now}: Energy = {E_mean:.4f}, Magnetization = {mag_avg:.4f}")
             sys.stdout.flush()
 
+        # Save checkpoint every 50 iterations
+        if it % 50 == 0:
+            if rank == 0:
+                checkpoint = {
+                    "iteration": it,
+                    "rbm_state_dict": rbm.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "energy_history": energy_history,
+                    "magnetization_history": magnetization_history
+                }
+                torch.save(checkpoint, checkpoint_file)
+                print(f"Saved checkpoint at iteration {it}")
+                sys.stdout.flush()
+    
     # Gather results from all MPI processes (should be 56 tasks on one node)
     energies_all = comm.gather(energy_history, root=0)
     mags_all = comm.gather(magnetization_history, root=0)
@@ -86,7 +104,7 @@ def main():
         plt.plot(avg_energy, marker='o', label="Energy")
         plt.xlabel("Iteration")
         plt.ylabel("Energy")
-        plt.title("Energy Convergence")
+        plt.title("Energy Convergence (MPI)")
         plt.legend()
         plt.grid(True)
         plt.savefig("mpi_energy_convergence.png")
@@ -97,7 +115,7 @@ def main():
         plt.plot(avg_mag, marker='o', label="Magnetization", color='red')
         plt.xlabel("Iteration")
         plt.ylabel("Magnetization")
-        plt.title("Magnetization Convergence")
+        plt.title("Magnetization Convergence (MPI)")
         plt.legend()
         plt.grid(True)
         plt.savefig("mpi_magnetization_convergence.png")
